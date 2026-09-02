@@ -16,7 +16,7 @@ if __name__ == '__main__':
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 print("hello joey")
 for i in range(1,10):
-    print(i*2)
+    print(i*4)
 
 
 
