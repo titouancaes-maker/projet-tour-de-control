@@ -25,6 +25,14 @@ from PySide6.QtWidgets import (
 # 1. MODÈLE DE DONNÉES & LOGIQUE MÉTIER
 # ==============================================================================
 
+@dataclass
+class Vector2D:
+    x: float
+    y: float
+
+    def distance_to(self, other: 'Vector2D') -> float:
+        return math.hypot(self.x - other.x, self.y - other.y)
+
 
 # ==============================================================================
 # 2. DIALOGUE DE DÉCISION / DILEMME
