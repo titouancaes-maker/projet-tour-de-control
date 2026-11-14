@@ -144,6 +144,68 @@ class Aircraft:
         self.position.y += math.sin(rad) * speed_units
 
 
+class AirspaceManager(QObject):
+    simulation_updated = Signal()
+
+    def __init__(self, width: int = 800, height: int = 600):
+        super().__init__()
+        self.width = width
+        self.height = height
+        self.aircrafts: List[Aircraft] = []
+        self.runway_pos = Vector2D(width / 2, height / 2)
+
+        self.money = 2000
+        self.score = 0
+        self.landed_count = 0
+        self.collisions_count = 0
+
+        self.radar_radius = 280
+        self.scan_angle = 0.0
+
+        self.spawn_timer = 0.0
+        self.time_elapsed = 0.0
+        self.airlines = ["AF", "LH", "BA", "TO", "EZ", "EK", "QR"]
+
+    def spawn_aircraft(self):
+        callsign = f"{random.choice(self.airlines)}{random.randint(100, 999)}"
+        spawn_dist = self.radar_radius + 20
+        angle = random.uniform(0, 2 * math.pi)
+
+        px = self.width / 2 + math.cos(angle) * spawn_dist
+        py = self.height / 2 + math.sin(angle) * spawn_dist
+
+        center_angle = math.degrees(math.atan2(self.height / 2 - py, self.width / 2 - px)) + 90
+        heading = center_angle % 360
+
+        alt = random.choice([2000, 3000, 4000])
+        spd = random.choice([350, 400, 450])
+        self.aircrafts.append(Aircraft(callsign, Vector2D(px, py), heading, alt, spd))
+
+    def update(self, dt: float):
+        self.time_elapsed += dt
+        self.scan_angle = (self.scan_angle + 180 * dt) % 360
+
+        self.spawn_timer += dt
+        if self.spawn_timer >= 5.0:
+            self.spawn_timer = 0.0
+            self.spawn_aircraft()
+
+        for plane in self.aircrafts:
+            plane.update(dt)
+
+        self._clean_up()
+
+        self.simulation_updated.emit()
+
+    def _clean_up(self):
+        max_dist = self.radar_radius + 150
+        center = self.runway_pos
+        self.aircrafts = [
+            p for p in self.aircrafts
+            if not p.is_landed and not p.has_crashed and p.position.distance_to(center) <= max_dist
+        ]
+
+
 # ==============================================================================
 # 2. DIALOGUE DE DÉCISION / DILEMME
 # ==============================================================================
@@ -170,3 +232,7 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+
+
+
