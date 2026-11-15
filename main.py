@@ -231,6 +231,68 @@ class AirspaceManager(QObject):
 # 3. VUE RADAR AVEC DÉZOOM AUTOMATIQUE
 # ==============================================================================
 
+class RadarWidget(QWidget):
+    def __init__(self, manager: AirspaceManager):
+        super().__init__()
+        self.manager = manager
+        self.setMinimumSize(600, 600)
+
+        self.runway_texture = AssetManager.get_runway_texture()
+
+    def _get_scale_factor(self) -> float:
+        """Calcule le facteur de dézoom pour que tout le radar tienne à l'écran."""
+        base_radius = 280.0
+        # Réduit la taille d'affichage au fur et à mesure que le rayon grandit
+        return base_radius / self.manager.radar_radius
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        cx, cy = self.width() / 2, self.height() / 2
+        scale = self._get_scale_factor()
+        r_drawn = self.manager.radar_radius * scale  # Rayon affiché à l'écran
+
+        # Fond Radar sombre
+        painter.fillRect(self.rect(), QColor("#080c10"))
+
+        # Cercles de portée ajustés à l'échelle
+        pen_grid = QPen(QColor(0, 255, 65, 40), 1, Qt.DashLine)
+        painter.setPen(pen_grid)
+        for step in range(80, int(self.manager.radar_radius) + 1, 80):
+            step_scaled = step * scale
+            painter.drawEllipse(QPointF(cx, cy), step_scaled, step_scaled)
+
+        painter.setPen(QPen(QColor(0, 255, 65, 180), 2))
+        painter.drawEllipse(QPointF(cx, cy), r_drawn, r_drawn)
+
+        # Affichage de la piste d'atterrissage à l'échelle
+        rw_w = self.runway_texture.width() * scale
+        rw_h = self.runway_texture.height() * scale
+        painter.drawPixmap(
+            int(cx - rw_w / 2), int(cy - rw_h / 2),
+            int(rw_w), int(rw_h),
+            self.runway_texture
+        )
+
+        # Balayage radar rotatif
+        sweep_grad = QConicalGradient(QPointF(cx, cy), -self.manager.scan_angle)
+        sweep_grad.setColorAt(0.0, QColor(0, 255, 65, 80))
+        sweep_grad.setColorAt(0.15, QColor(0, 255, 65, 20))
+        sweep_grad.setColorAt(0.3, QColor(0, 255, 65, 0))
+        sweep_grad.setColorAt(1.0, QColor(0, 255, 65, 0))
+
+        painter.setBrush(QBrush(sweep_grad))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(cx, cy), r_drawn, r_drawn)
+
+        rad_angle = math.radians(self.manager.scan_angle)
+        lx = cx + math.cos(rad_angle) * r_drawn
+        ly = cy + math.sin(rad_angle) * r_drawn
+        painter.setPen(QPen(QColor(0, 255, 65, 220), 2))
+        painter.drawLine(int(cx), int(cy), int(lx), int(ly))
+
 
 # ==============================================================================
 # 4. INTERFACE PRINCIPALE & CONTRÔLES
@@ -241,6 +303,28 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Ipsa - Tour de controle")
         self.resize(1150, 720)
+
+        self.manager = AirspaceManager(700, 680)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.game_loop)
+        self.timer.start(50)
+
+        self._init_ui()
+
+    def _init_ui(self):
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QHBoxLayout(main_widget)
+
+        # ---------------- RADAR CENTRAL ----------------
+        self.radar = RadarWidget(self.manager)
+        main_layout.addWidget(self.radar, stretch=3)
+
+    # ---------------- LOGIQUE IHM ----------------
+
+    def game_loop(self):
+        self.manager.update(0.05)
+        self.radar.update()
 
 
 if __name__ == "__main__":
