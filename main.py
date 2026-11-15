@@ -193,9 +193,25 @@ class AirspaceManager(QObject):
         for plane in self.aircrafts:
             plane.update(dt)
 
+        self._check_collisions()
         self._clean_up()
 
         self.simulation_updated.emit()
+
+    def _check_collisions(self):
+        n = len(self.aircrafts)
+        for i in range(n):
+            for j in range(i + 1, n):
+                p1, p2 = self.aircrafts[i], self.aircrafts[j]
+                if p1.is_landed or p2.is_landed:
+                    continue
+
+                dist = p1.position.distance_to(p2.position)
+                if dist < 28 and abs(p1.altitude - p2.altitude) < 300:
+                    p1.has_crashed = True
+                    p2.has_crashed = True
+                    self.collisions_count += 1
+                    self.money = max(0, self.money - 2000)
 
     def _clean_up(self):
         max_dist = self.radar_radius + 150
@@ -232,7 +248,3 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
-
-
-
-
