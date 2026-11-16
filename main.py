@@ -237,6 +237,7 @@ class RadarWidget(QWidget):
         self.manager = manager
         self.setMinimumSize(600, 600)
 
+        self.plane_sprite = AssetManager.get_airplane_sprite()
         self.runway_texture = AssetManager.get_runway_texture()
 
     def _get_scale_factor(self) -> float:
@@ -268,6 +269,7 @@ class RadarWidget(QWidget):
         painter.drawEllipse(QPointF(cx, cy), r_drawn, r_drawn)
 
         # Affichage de la piste d'atterrissage à l'échelle
+        r_pos = self.manager.runway_pos
         rw_w = self.runway_texture.width() * scale
         rw_h = self.runway_texture.height() * scale
         painter.drawPixmap(
@@ -292,6 +294,40 @@ class RadarWidget(QWidget):
         ly = cy + math.sin(rad_angle) * r_drawn
         painter.setPen(QPen(QColor(0, 255, 65, 220), 2))
         painter.drawLine(int(cx), int(cy), int(lx), int(ly))
+
+        # Dessin des avions recalculés selon le zoom
+        for plane in self.manager.aircrafts:
+            if plane.position.distance_to(r_pos) <= self.manager.radar_radius:
+                self._draw_aircraft(painter, plane, cx, cy, scale)
+
+    def _draw_aircraft(self, painter: QPainter, plane: Aircraft, cx: float, cy: float, scale: float):
+        r_pos = self.manager.runway_pos
+
+        # Repositionnement selon l'échelle
+        screen_x = cx + (plane.position.x - r_pos.x) * scale
+        screen_y = cy + (plane.position.y - r_pos.y) * scale
+
+        alt_offset = (plane.altitude / 1000.0) * 2.5 * scale
+
+        painter.save()
+
+        # Applique la translation et le dézoom au sprite de l'avion
+        transform = QTransform()
+        transform.translate(screen_x, screen_y - alt_offset)
+        transform.scale(scale, scale)
+        transform.rotate(plane.heading)
+        transform.translate(-self.plane_sprite.width() / 2, -self.plane_sprite.height() / 2)
+
+        painter.setTransform(transform, combine=True)
+        painter.drawPixmap(0, 0, self.plane_sprite)
+        painter.restore()
+
+        color = QColor(0, 255, 65)
+        # Étiquette
+        painter.setPen(QPen(color))
+        painter.setFont(QFont("Consolas", 8))
+        label = f"{plane.callsign}\n{int(plane.altitude)}m | {int(plane.speed)}km/h\nFL:{int(plane.fuel)}%"
+        painter.drawText(int(screen_x + (16 * scale)), int(screen_y - alt_offset + 4), label)
 
 
 # ==============================================================================
