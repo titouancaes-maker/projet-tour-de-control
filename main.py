@@ -194,6 +194,7 @@ class AirspaceManager(QObject):
             plane.update(dt)
 
         self._check_collisions()
+        self._check_landings()
         self._clean_up()
 
         self.simulation_updated.emit()
@@ -212,6 +213,19 @@ class AirspaceManager(QObject):
                     p2.has_crashed = True
                     self.collisions_count += 1
                     self.money = max(0, self.money - 2000)
+
+    def _check_landings(self):
+        for plane in self.aircrafts:
+            if plane.is_landed or plane.has_crashed:
+                continue
+
+            dist = plane.position.distance_to(self.runway_pos)
+            if dist < 45 and plane.altitude <= 500 and plane.speed <= 250:
+                plane.is_landed = True
+                self.landed_count += 1
+                reward = 800 + (600 if plane.is_emergency else 0)
+                self.money += reward
+                self.score += 250
 
     def _clean_up(self):
         max_dist = self.radar_radius + 150
