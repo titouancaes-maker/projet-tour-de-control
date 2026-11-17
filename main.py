@@ -414,14 +414,54 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QHBoxLayout(main_widget)
 
+        # ---------------- PANEL GAUCHE ----------------
+        left_panel = QVBoxLayout()
+
+        stats_box = QGroupBox("FINANCES & PERFORMANCE")
+        stats_layout = QVBoxLayout()
+        self.lbl_money = QLabel("Argent : 0 $")
+        self.lbl_score = QLabel("Score : 0")
+        self.lbl_landed = QLabel("Atterrissages : 0")
+        self.lbl_collisions = QLabel("Collisions : 0")
+
+        for lbl in [self.lbl_money, self.lbl_score, self.lbl_landed, self.lbl_collisions]:
+            lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
+            stats_layout.addWidget(lbl)
+
+        stats_box.setLayout(stats_layout)
+        left_panel.addWidget(stats_box)
+
+        plane_box = QGroupBox("AVIONS DÉTECTÉS")
+        plane_layout = QVBoxLayout()
+        self.plane_list_widget = QListWidget()
+        plane_layout.addWidget(self.plane_list_widget)
+        plane_box.setLayout(plane_layout)
+        left_panel.addWidget(plane_box)
+
+        main_layout.addLayout(left_panel, stretch=1)
+
         # ---------------- RADAR CENTRAL ----------------
         self.radar = RadarWidget(self.manager)
         main_layout.addWidget(self.radar, stretch=3)
+
     # ---------------- LOGIQUE IHM ----------------
 
     def game_loop(self):
         self.manager.update(0.05)
         self.radar.update()
+
+        self.lbl_money.setText(f"Budget : {self.manager.money} $")
+        self.lbl_score.setText(f"Score : {self.manager.score}")
+        self.lbl_landed.setText(f"Atterrissages : {self.manager.landed_count}")
+        self.lbl_collisions.setText(f"Collisions : {self.manager.collisions_count}")
+
+        self.sync_aircraft_list()
+
+    def sync_aircraft_list(self):
+        self.plane_list_widget.clear()
+        for plane in self.manager.aircrafts:
+            item = QListWidgetItem(f"{plane.callsign} - {int(plane.altitude)}m")
+            self.plane_list_widget.addItem(item)
 
 
 if __name__ == "__main__":
