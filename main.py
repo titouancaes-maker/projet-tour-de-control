@@ -294,9 +294,12 @@ class AirspaceManager(QObject):
 # ==============================================================================
 
 class RadarWidget(QWidget):
+    aircraft_selected = Signal(str)
+
     def __init__(self, manager: AirspaceManager):
         super().__init__()
         self.manager = manager
+        self.selected_callsign: Optional[str] = None
         self.setMinimumSize(600, 600)
 
         self.plane_sprite = AssetManager.get_airplane_sprite()
@@ -307,6 +310,26 @@ class RadarWidget(QWidget):
         base_radius = 280.0
         # Réduit la taille d'affichage au fur et à mesure que le rayon grandit
         return base_radius / self.manager.radar_radius
+
+    def mousePressEvent(self, event):
+        cx, cy = self.width() / 2, self.height() / 2
+        scale = self._get_scale_factor()
+
+        # Transformation du clic écran vers le repère virtuel du monde
+        click_x = (event.position().x() - cx) / scale + self.manager.runway_pos.x
+        click_y = (event.position().y() - cy) / scale + self.manager.runway_pos.y
+        click_pos = Vector2D(click_x, click_y)
+
+        selected = None
+        for plane in self.manager.aircrafts:
+            if plane.position.distance_to(click_pos) < (30 / scale):
+                selected = plane.callsign
+                break
+
+        self.selected_callsign = selected
+        if selected:
+            self.aircraft_selected.emit(selected)
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -369,6 +392,7 @@ class RadarWidget(QWidget):
         screen_x = cx + (plane.position.x - r_pos.x) * scale
         screen_y = cy + (plane.position.y - r_pos.y) * scale
 
+        is_sel = (plane.callsign == self.selected_callsign)
         alt_offset = (plane.altitude / 1000.0) * 2.5 * scale
 
         painter.save()
@@ -385,6 +409,13 @@ class RadarWidget(QWidget):
         painter.restore()
 
         color = QColor(0, 255, 65)
+        if is_sel:
+            color = QColor(0, 210, 255)
+
+        if is_sel:
+            painter.setPen(QPen(QColor(0, 210, 255), 1.5, Qt.DashLine))
+            painter.drawEllipse(QPointF(screen_x, screen_y - alt_offset), 20 * scale, 20 * scale)
+
         # Étiquette
         painter.setPen(QPen(color))
         painter.setFont(QFont("Consolas", 8))
@@ -434,6 +465,7 @@ class MainWindow(QMainWindow):
         plane_box = QGroupBox("AVIONS DÉTECTÉS")
         plane_layout = QVBoxLayout()
         self.plane_list_widget = QListWidget()
+        self.plane_list_widget.itemClicked.connect(self.on_list_item_clicked)
         plane_layout.addWidget(self.plane_list_widget)
         plane_box.setLayout(plane_layout)
         left_panel.addWidget(plane_box)
@@ -442,7 +474,48 @@ class MainWindow(QMainWindow):
 
         # ---------------- RADAR CENTRAL ----------------
         self.radar = RadarWidget(self.manager)
+        self.radar.aircraft_selected.connect(self.on_radar_aircraft_selected)
         main_layout.addWidget(self.radar, stretch=3)
+
+        # ---------------- PANEL DROIT ----------------
+        right_panel = QVBoxLayout()
+        ctrl_box = QGroupBox("ORDRES DE TACTIQUE")
+        ctrl_layout = QVBoxLayout()
+
+        self.lbl_selected_plane = QLabel("Sélection : Aucun")
+        self.lbl_selected_plane.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        ctrl_layout.addWidget(self.lbl_selected_plane)
+
+        self.fuel_bar = QProgressBar()
+        ctrl_layout.addWidget(QLabel("Carburant :"))
+        ctrl_layout.addWidget(self.fuel_bar)
+
+        ctrl_layout.addSpacing(10)
+
+        btn_climb = QPushButton("Monter (+500m)")
+        btn_descend = QPushButton("Descendre (-500m)")
+        btn_turn_left = QPushButton("Cap +15° (Gauche)")
+        btn_turn_right = QPushButton("Cap +15° (Droite)")
+        btn_speed_up = QPushButton("Vitesse (+50 km/h)")
+        btn_slow_down = QPushButton("Vitesse (-50 km/h)")
+        btn_land = QPushButton("Approche Atterrissage")
+
+        btn_climb.clicked.connect(lambda: self.send_instruction("CLIMB"))
+        btn_descend.clicked.connect(lambda: self.send_instruction("DESCEND"))
+        btn_turn_left.clicked.connect(lambda: self.send_instruction("LEFT"))
+        btn_turn_right.clicked.connect(lambda: self.send_instruction("RIGHT"))
+        btn_speed_up.clicked.connect(lambda: self.send_instruction("FASTER"))
+        btn_slow_down.clicked.connect(lambda: self.send_instruction("SLOWER"))
+        btn_land.clicked.connect(lambda: self.send_instruction("LAND"))
+
+        for b in [btn_climb, btn_descend, btn_turn_left, btn_turn_right, btn_speed_up, btn_slow_down, btn_land]:
+            ctrl_layout.addWidget(b)
+
+        ctrl_layout.addStretch()
+        ctrl_box.setLayout(ctrl_layout)
+        right_panel.addWidget(ctrl_box)
+
+        main_layout.addLayout(right_panel, stretch=1)
 
     # ---------------- LOGIQUE IHM ----------------
 
@@ -456,12 +529,62 @@ class MainWindow(QMainWindow):
         self.lbl_collisions.setText(f"Collisions : {self.manager.collisions_count}")
 
         self.sync_aircraft_list()
+        self.update_control_panel()
 
     def sync_aircraft_list(self):
         self.plane_list_widget.clear()
         for plane in self.manager.aircrafts:
             item = QListWidgetItem(f"{plane.callsign} - {int(plane.altitude)}m")
+            if plane.callsign == self.radar.selected_callsign:
+                item.setSelected(True)
             self.plane_list_widget.addItem(item)
+
+    def on_list_item_clicked(self, item: QListWidgetItem):
+        callsign = item.text().split(" ")[0]
+        self.radar.selected_callsign = callsign
+        self.update_control_panel()
+
+    def on_radar_aircraft_selected(self, callsign: str):
+        self.update_control_panel()
+
+    def update_control_panel(self):
+        callsign = self.radar.selected_callsign
+        plane = next((p for p in self.manager.aircrafts if p.callsign == callsign), None)
+
+        if plane:
+            self.lbl_selected_plane.setText(f"Sélection : {plane.callsign}")
+            self.fuel_bar.setValue(int(plane.fuel))
+        else:
+            self.lbl_selected_plane.setText("Sélection : Aucun")
+            self.fuel_bar.setValue(0)
+
+    def send_instruction(self, action: str):
+        callsign = self.radar.selected_callsign
+        plane = next((p for p in self.manager.aircrafts if p.callsign == callsign), None)
+
+        if not plane:
+            return
+
+        if action == "CLIMB":
+            plane.target_altitude = min(10000, plane.target_altitude + 500)
+        elif action == "DESCEND":
+            plane.target_altitude = max(0, plane.target_altitude - 500)
+        elif action == "LEFT":
+            plane.target_heading = (plane.target_heading - 15) % 360
+        elif action == "RIGHT":
+            plane.target_heading = (plane.target_heading + 15) % 360
+        elif action == "FASTER":
+            plane.target_speed = min(900, plane.target_speed + 50)
+        elif action == "SLOWER":
+            plane.target_speed = max(180, plane.target_speed - 50)
+        elif action == "LAND":
+            runway = self.manager.runway_pos
+            dx = runway.x - plane.position.x
+            dy = runway.y - plane.position.y
+            target_angle = math.degrees(math.atan2(dy, dx)) + 90
+            plane.target_heading = target_angle % 360
+            plane.target_altitude = 300
+            plane.target_speed = 220
 
 
 if __name__ == "__main__":
