@@ -1,4 +1,4 @@
-import sys
+GIT import sys
 import math
 import random
 from dataclasses import dataclass
@@ -444,7 +444,7 @@ class MainWindow(QMainWindow):
         self.radar = RadarWidget(self.manager)
         main_layout.addWidget(self.radar, stretch=3)
 
-    # ---------------- LOGIQUE IHM ----------------
+    # ---------------- LOGIQUE IHM --------------
 
     def game_loop(self):
         self.manager.update(0.05)
