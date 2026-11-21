@@ -207,12 +207,23 @@ class AirspaceManager(QObject):
         self.landed_count = 0
         self.collisions_count = 0
 
+        self.radar_level = 1
         self.radar_radius = 280
+        self.radar_upgrade_cost = 3000
         self.scan_angle = 0.0
 
         self.spawn_timer = 0.0
         self.time_elapsed = 0.0
         self.airlines = ["AF", "LH", "BA", "TO", "EZ", "EK", "QR"]
+
+    def upgrade_radar(self) -> bool:
+        if self.money >= self.radar_upgrade_cost and self.radar_level < 3:
+            self.money -= self.radar_upgrade_cost
+            self.radar_level += 1
+            self.radar_radius += 120
+            self.radar_upgrade_cost = int(self.radar_upgrade_cost * 2.2)
+            return True
+        return False
 
     def spawn_aircraft(self):
         callsign = f"{random.choice(self.airlines)}{random.randint(100, 999)}"
@@ -287,6 +298,40 @@ class AirspaceManager(QObject):
 # ==============================================================================
 # 2. DIALOGUE DE DÉCISION / DILEMME
 # ==============================================================================
+
+class DilemmaDialog(QDialog):
+    def __init__(self, dilemma: Dilemma, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"🚨 URGENCE : {dilemma.title}")
+        self.resize(450, 250)
+        self.dilemma = dilemma
+        self.selected_option_idx = -1
+
+        layout = QVBoxLayout(self)
+
+        desc = QLabel(dilemma.description)
+        desc.setWordWrap(True)
+        desc.setFont(QFont("Segoe UI", 10))
+        layout.addWidget(desc)
+
+        self.button_group = QButtonGroup(self)
+        for idx, (opt_text, _, _, _) in enumerate(dilemma.options):
+            rb = QRadioButton(opt_text)
+            rb.setFont(QFont("Segoe UI", 9))
+            self.button_group.addButton(rb, idx)
+            layout.addWidget(rb)
+
+        btn_confirm = QPushButton("Confirmer l'Instruction")
+        btn_confirm.setStyleSheet("background-color: #1f6feb; font-weight: bold; padding: 8px;")
+        btn_confirm.clicked.connect(self.accept_choice)
+        layout.addWidget(btn_confirm)
+
+    def accept_choice(self):
+        self.selected_option_idx = self.button_group.checkedId()
+        if self.selected_option_idx != -1:
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Attention", "Veuillez sélectionner une instruction.")
 
 
 # ==============================================================================
@@ -409,7 +454,9 @@ class RadarWidget(QWidget):
         painter.restore()
 
         color = QColor(0, 255, 65)
-        if is_sel:
+        if plane.is_emergency:
+            color = QColor(255, 50, 50)
+        elif is_sel:
             color = QColor(0, 210, 255)
 
         if is_sel:
@@ -419,7 +466,8 @@ class RadarWidget(QWidget):
         # Étiquette
         painter.setPen(QPen(color))
         painter.setFont(QFont("Consolas", 8))
-        label = f"{plane.callsign}\n{int(plane.altitude)}m | {int(plane.speed)}km/h\nFL:{int(plane.fuel)}%"
+        dilemma_tag = " [!]" if (plane.pending_dilemma and not plane.dilemma_resolved) else ""
+        label = f"{plane.callsign}{dilemma_tag}\n{int(plane.altitude)}m | {int(plane.speed)}km/h\nFL:{int(plane.fuel)}%"
         painter.drawText(int(screen_x + (16 * scale)), int(screen_y - alt_offset + 4), label)
 
 
@@ -490,6 +538,11 @@ class MainWindow(QMainWindow):
         ctrl_layout.addWidget(QLabel("Carburant :"))
         ctrl_layout.addWidget(self.fuel_bar)
 
+        self.btn_dilemma = QPushButton("RÉSOUDRE CRISE / DILEMME")
+        self.btn_dilemma.clicked.connect(self.open_dilemma_modal)
+        self.btn_dilemma.setEnabled(False)
+        ctrl_layout.addWidget(self.btn_dilemma)
+
         ctrl_layout.addSpacing(10)
 
         btn_climb = QPushButton("Monter (+500m)")
@@ -518,7 +571,6 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_panel, stretch=1)
 
     # ---------------- LOGIQUE IHM ----------------
-    # ---------------- LOGIQUE IHM --------------
 
     def game_loop(self):
         self.manager.update(0.05)
@@ -535,7 +587,13 @@ class MainWindow(QMainWindow):
     def sync_aircraft_list(self):
         self.plane_list_widget.clear()
         for plane in self.manager.aircrafts:
-            item = QListWidgetItem(f"{plane.callsign} - {int(plane.altitude)}m")
+            status = ""
+            if plane.pending_dilemma and not plane.dilemma_resolved:
+                status = " [CRISE]"
+            elif plane.is_emergency:
+                status = " [URGENCE]"
+
+            item = QListWidgetItem(f"{plane.callsign}{status} - {int(plane.altitude)}m")
             if plane.callsign == self.radar.selected_callsign:
                 item.setSelected(True)
             self.plane_list_widget.addItem(item)
@@ -555,9 +613,33 @@ class MainWindow(QMainWindow):
         if plane:
             self.lbl_selected_plane.setText(f"Sélection : {plane.callsign}")
             self.fuel_bar.setValue(int(plane.fuel))
+
+            if plane.pending_dilemma and not plane.dilemma_resolved:
+                self.btn_dilemma.setEnabled(True)
+            else:
+                self.btn_dilemma.setEnabled(False)
         else:
             self.lbl_selected_plane.setText("Sélection : Aucun")
             self.fuel_bar.setValue(0)
+            self.btn_dilemma.setEnabled(False)
+
+    def open_dilemma_modal(self):
+        callsign = self.radar.selected_callsign
+        plane = next((p for p in self.manager.aircrafts if p.callsign == callsign), None)
+
+        if plane and plane.pending_dilemma and not plane.dilemma_resolved:
+            dialog = DilemmaDialog(plane.pending_dilemma, self)
+            if dialog.exec():
+                opt_idx = dialog.selected_option_idx
+                _, is_success, result_msg, reward = plane.pending_dilemma.options[opt_idx]
+
+                plane.dilemma_resolved = True
+                self.manager.money += reward
+
+                if is_success:
+                    QMessageBox.information(self, "Résultat de la Décision", f"RÉUSSITE :\n{result_msg}")
+                else:
+                    QMessageBox.critical(self, "Résultat de la Décision", f"ÉCHEC :\n{result_msg}")
 
     def send_instruction(self, action: str):
         callsign = self.radar.selected_callsign
