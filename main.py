@@ -207,12 +207,23 @@ class AirspaceManager(QObject):
         self.landed_count = 0
         self.collisions_count = 0
 
+        self.radar_level = 1
         self.radar_radius = 280
+        self.radar_upgrade_cost = 3000
         self.scan_angle = 0.0
 
         self.spawn_timer = 0.0
         self.time_elapsed = 0.0
         self.airlines = ["AF", "LH", "BA", "TO", "EZ", "EK", "QR"]
+
+    def upgrade_radar(self) -> bool:
+        if self.money >= self.radar_upgrade_cost and self.radar_level < 3:
+            self.money -= self.radar_upgrade_cost
+            self.radar_level += 1
+            self.radar_radius += 120
+            self.radar_upgrade_cost = int(self.radar_upgrade_cost * 2.2)
+            return True
+        return False
 
     def spawn_aircraft(self):
         callsign = f"{random.choice(self.airlines)}{random.randint(100, 999)}"
@@ -234,9 +245,11 @@ class AirspaceManager(QObject):
         self.scan_angle = (self.scan_angle + 180 * dt) % 360
 
         self.spawn_timer += dt
-        if self.spawn_timer >= 5.0:
+        spawn_interval = max(2.5, 10.0 - (self.time_elapsed / 30.0))
+        if self.spawn_timer >= spawn_interval:
             self.spawn_timer = 0.0
-            self.spawn_aircraft()
+            if len(self.aircrafts) < 25:
+                self.spawn_aircraft()
 
         for plane in self.aircrafts:
             plane.update(dt)
@@ -518,7 +531,6 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_panel, stretch=1)
 
     # ---------------- LOGIQUE IHM ----------------
-    # ---------------- LOGIQUE IHM --------------
 
     def game_loop(self):
         self.manager.update(0.05)
