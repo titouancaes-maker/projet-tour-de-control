@@ -512,6 +512,17 @@ class MainWindow(QMainWindow):
         stats_box.setLayout(stats_layout)
         left_panel.addWidget(stats_box)
 
+        shop_box = QGroupBox("EXTENSIONS TOUR DE CONTRÔLE")
+        shop_layout = QVBoxLayout()
+        self.btn_upgrade_radar = QPushButton("Améliorer Radar (3 000 $)")
+        self.btn_upgrade_radar.clicked.connect(self.buy_radar_upgrade)
+        self.lbl_radar_info = QLabel("Niveau Radar : 1 (Portée: 280px)")
+
+        shop_layout.addWidget(self.lbl_radar_info)
+        shop_layout.addWidget(self.btn_upgrade_radar)
+        shop_box.setLayout(shop_layout)
+        left_panel.addWidget(shop_box)
+
         plane_box = QGroupBox("AVIONS DÉTECTÉS")
         plane_layout = QVBoxLayout()
         self.plane_list_widget = QListWidget()
@@ -583,6 +594,10 @@ class MainWindow(QMainWindow):
         self.lbl_landed.setText(f"Atterrissages : {self.manager.landed_count}")
         self.lbl_collisions.setText(f"Collisions : {self.manager.collisions_count}")
 
+        self.btn_upgrade_radar.setText(f"Agrandir Radar ({self.manager.radar_upgrade_cost} $)")
+        self.lbl_radar_info.setText(
+            f"Niveau Radar : {self.manager.radar_level} (Portée: {self.manager.radar_radius}px)")
+
         self.sync_aircraft_list()
         self.update_control_panel()
 
@@ -599,6 +614,13 @@ class MainWindow(QMainWindow):
             if plane.callsign == self.radar.selected_callsign:
                 item.setSelected(True)
             self.plane_list_widget.addItem(item)
+
+    def buy_radar_upgrade(self):
+        if self.manager.upgrade_radar():
+            QMessageBox.information(self, "Extension de Portée",
+                                    "Portée du radar et vue d'ensemble agrandies avec succès !")
+        else:
+            QMessageBox.warning(self, "Fonds Insuffisants", "Fonds insuffisants pour étendre la couverture du radar.")
 
     def on_list_item_clicked(self, item: QListWidgetItem):
         callsign = item.text().split(" ")[0]
