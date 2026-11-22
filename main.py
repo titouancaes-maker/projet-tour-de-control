@@ -171,7 +171,11 @@ class Aircraft:
         if self.is_landed or self.has_crashed:
             return
 
-        self.fuel = max(0, self.fuel - 0.04 * dt)
+        self.fuel -= 0.04 * dt
+        if self.fuel <= 0:
+            self.fuel = 0
+            self.has_crashed = True
+            return
 
         if abs(self.heading - self.target_heading) > 0.5:
             diff = (self.target_heading - self.heading + 540) % 360 - 180
