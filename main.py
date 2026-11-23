@@ -484,7 +484,7 @@ class RadarWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ipsa - Tour de controle")
+        self.setWindowTitle("IPSA - Tour de Contrôle : Extended Radar & Graphic Simulation")
         self.resize(1150, 720)
 
         self.manager = AirspaceManager(700, 680)
@@ -493,6 +493,7 @@ class MainWindow(QMainWindow):
         self.timer.start(50)
 
         self._init_ui()
+        self.apply_stylesheet()
 
     def _init_ui(self):
         main_widget = QWidget()
@@ -513,12 +514,14 @@ class MainWindow(QMainWindow):
             lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
             stats_layout.addWidget(lbl)
 
+        self.lbl_money.setStyleSheet("color: #2ea043;")
         stats_box.setLayout(stats_layout)
         left_panel.addWidget(stats_box)
 
         shop_box = QGroupBox("EXTENSIONS TOUR DE CONTRÔLE")
         shop_layout = QVBoxLayout()
         self.btn_upgrade_radar = QPushButton("Améliorer Radar (3 000 $)")
+        self.btn_upgrade_radar.setStyleSheet("background-color: #238636; font-weight: bold;")
         self.btn_upgrade_radar.clicked.connect(self.buy_radar_upgrade)
         self.lbl_radar_info = QLabel("Niveau Radar : 1 (Portée: 280px)")
 
@@ -555,20 +558,22 @@ class MainWindow(QMainWindow):
         ctrl_layout.addWidget(QLabel("Carburant :"))
         ctrl_layout.addWidget(self.fuel_bar)
 
-        self.btn_dilemma = QPushButton("RÉSOUDRE CRISE / DILEMME")
+        self.btn_dilemma = QPushButton("⚠️ RÉSOUDRE CRISE / DILEMME")
+        self.btn_dilemma.setStyleSheet("background-color: #da3633; font-weight: bold; padding: 10px;")
         self.btn_dilemma.clicked.connect(self.open_dilemma_modal)
         self.btn_dilemma.setEnabled(False)
         ctrl_layout.addWidget(self.btn_dilemma)
 
         ctrl_layout.addSpacing(10)
 
-        btn_climb = QPushButton("Monter (+500m)")
-        btn_descend = QPushButton("Descendre (-500m)")
-        btn_turn_left = QPushButton("Cap +15° (Gauche)")
-        btn_turn_right = QPushButton("Cap +15° (Droite)")
-        btn_speed_up = QPushButton("Vitesse (+50 km/h)")
-        btn_slow_down = QPushButton("Vitesse (-50 km/h)")
-        btn_land = QPushButton("Approche Atterrissage")
+        btn_climb = QPushButton("▲ Monter (+500m)")
+        btn_descend = QPushButton("▼ Descendre (-500m)")
+        btn_turn_left = QPushButton("◄ Cap +15° (Gauche)")
+        btn_turn_right = QPushButton("► Cap +15° (Droite)")
+        btn_speed_up = QPushButton("⚡ Vitesse (+50 km/h)")
+        btn_slow_down = QPushButton("⚓ Vitesse (-50 km/h)")
+        btn_land = QPushButton("🛬 Approche Atterrissage")
+        btn_land.setStyleSheet("background-color: #1f6feb; font-weight: bold;")
 
         btn_climb.clicked.connect(lambda: self.send_instruction("CLIMB"))
         btn_descend.clicked.connect(lambda: self.send_instruction("DESCEND"))
@@ -696,6 +701,57 @@ class MainWindow(QMainWindow):
             plane.target_heading = target_angle % 360
             plane.target_altitude = 300
             plane.target_speed = 220
+
+    def apply_stylesheet(self):
+        self.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: #0d1117;
+                color: #c9d1d9;
+                font-family: 'Segoe UI', sans-serif;
+            }
+            QGroupBox {
+                border: 1px solid #30363d;
+                border-radius: 5px;
+                margin-top: 10px;
+                font-weight: bold;
+                color: #58a6ff;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+            }
+            QPushButton {
+                background-color: #21262d;
+                border: 1px solid #30363d;
+                border-radius: 4px;
+                padding: 6px;
+                color: #c9d1d9;
+            }
+            QPushButton:hover {
+                background-color: #30363d;
+                border-color: #8b949e;
+            }
+            QPushButton:disabled {
+                background-color: #161b22;
+                color: #484f58;
+            }
+            QListWidget {
+                background-color: #161b22;
+                border: 1px solid #30363d;
+            }
+            QListWidget::item:selected {
+                background-color: #1f6feb;
+                color: white;
+            }
+            QProgressBar {
+                border: 1px solid #30363d;
+                border-radius: 3px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #238636;
+            }
+        """)
 
 
 if __name__ == "__main__":
