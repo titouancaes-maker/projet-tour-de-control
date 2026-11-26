@@ -106,10 +106,28 @@ classDiagram
     DilemmaDialog --> Dilemma : affiche
 ```
 
-## Répartition dans main.py
+## Organisation en fichiers
 
-| Partie de main.py | Classes | Responsable |
+Chaque partie de travail a son fichier. Une flèche signifie « importe » : les dépendances vont toujours du haut vers le bas.
+
+```mermaid
+flowchart TD
+    main["main.py<br/>lancement de l'application"] --> mw["main_window.py<br/>MainWindow"]
+    mw --> rw["radar_widget.py<br/>RadarWidget"]
+    mw --> dd["dilemma_dialog.py<br/>DilemmaDialog"]
+    mw --> models["models.py<br/>Vector2D, Dilemma, Aircraft, AirspaceManager"]
+    rw --> models
+    rw --> assets["assets.py<br/>AssetManager"]
+    dd --> models
+```
+
+## Répartition par fichier
+
+| Fichier | Classes | Responsable |
 | --- | --- | --- |
-| 0 | AssetManager | Personne A (interface) |
-| 1 | Vector2D, Dilemma, Aircraft, AirspaceManager | Personne B (fonctionnement) |
-| 2, 3, 4 | DilemmaDialog, RadarWidget, MainWindow | Personne A (interface) |
+| assets.py | AssetManager | Personne A (interface) |
+| models.py | Vector2D, Dilemma, Aircraft, AirspaceManager | Personne B (fonctionnement) |
+| radar_widget.py | RadarWidget | Personne A (interface) |
+| dilemma_dialog.py | DilemmaDialog | Personne A (interface) |
+| main_window.py | MainWindow | Personne A (interface) |
+| main.py | point d'entrée (aucune classe) | commun |

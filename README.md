@@ -11,15 +11,16 @@ python main.py
 
 ## Structure du projet
 
-Tout le code est dans `main.py`, organisé en 5 parties :
+Le code est réparti en **un fichier par partie de travail**. Les imports vont toujours dans le même sens (`main.py` → `main_window.py` → `radar_widget.py` / `dilemma_dialog.py` → `models.py` / `assets.py`), ce qui évite les imports circulaires.
 
-| Partie | Classes | Rôle | Responsable |
+| Fichier | Classes | Rôle | Responsable |
 | --- | --- | --- | --- |
-| 0. Générateur de sprites | AssetManager | dessine l'avion et la piste en code | Personne A |
-| 1. Modèle et logique métier | Vector2D, Dilemma, Aircraft, AirspaceManager | état des avions, règles du jeu (collisions, atterrissages, budget) | Personne B |
-| 2. Dialogue de décision | DilemmaDialog | fenêtre de choix pendant une crise | Personne A |
-| 3. Vue radar | RadarWidget | affichage du radar, sélection à la souris | Personne A |
-| 4. Interface principale | MainWindow | panneaux, boutons, boucle de jeu (QTimer) | Personne A |
+| `assets.py` | AssetManager | dessine l'avion et la piste en code | Personne A |
+| `models.py` | Vector2D, Dilemma, Aircraft, AirspaceManager | état des avions, règles du jeu (collisions, atterrissages, budget) | Personne B |
+| `radar_widget.py` | RadarWidget | affichage du radar, sélection à la souris | Personne A |
+| `dilemma_dialog.py` | DilemmaDialog | fenêtre de choix pendant une crise | Personne A |
+| `main_window.py` | MainWindow | panneaux, boutons, boucle de jeu (QTimer) | Personne A |
+| `main.py` | (aucune) | point d'entrée : crée l'application et affiche la fenêtre | commun |
 
 Autres fichiers : `docs/uml_classes.md` (diagramme UML), `requirements.txt`, `.gitignore`.
 
